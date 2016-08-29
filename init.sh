@@ -1,5 +1,6 @@
 aclocal
 autoconf
+autoheader
 automake --add-missing
-configure
+./configure
 make
