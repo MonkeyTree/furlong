@@ -20,20 +20,17 @@ pid_t create_pidfile(void)
 
     if ((fd = open(PID_FILE, O_RDWR | O_CREAT | O_CLOEXEC, S_IRUSR | S_IWUSR)) == -1) {
         syslog(LOG_ERR, "Unable to open or create pid file %s: (%d)%s", PID_FILE, errno, strerror(errno));
-        printf("Unable to open or create pid file %s: (%d)%s", PID_FILE, errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     if (flock(fd, LOCK_EX | LOCK_NB) == -1) {
         syslog(LOG_ERR, "Unable to lock pid file %s: (%d)%s", PID_FILE, errno, strerror(errno));
-        printf("Unable to lock pid file %s: (%d)%s", PID_FILE, errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     /* delete contents of file */
     if (ftruncate(fd, 0) == -1) {
         syslog(LOG_ERR, "Unable to truncate pid file %s: (%d)%s", PID_FILE, errno, strerror(errno));
-        printf("Unable to truncate pid file %s: (%d)%s", PID_FILE, errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
@@ -41,7 +38,6 @@ pid_t create_pidfile(void)
     snprintf(buf, sizeof(buf), "%ld\n", (long)pid);
     if (write(fd, buf, strlen(buf)) != strlen(buf)) {
         syslog(LOG_ERR, "Unable to write pid to %s: (%d)%s", PID_FILE, errno, strerror(errno));
-        printf("Unable to write pid to %s: (%d)%s", PID_FILE, errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
