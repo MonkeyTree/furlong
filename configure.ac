@@ -5,7 +5,7 @@ AC_PREREQ([2.69])
 AC_INIT(furlong, 1.0.0 furlong@monketree.org)
 AC_CONFIG_MACRO_DIR([m4])
 
-AC_CONFIG_SRCDIR([src/main.c])
+AC_CONFIG_SRCDIR([src/furlongd/main.c])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
@@ -38,4 +38,4 @@ AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects] )
 
 AC_CHECK_FUNCS([memset socket])
 
-AC_OUTPUT(Makefile src/Makefile include/Makefile doc/Makefile examples/Makefile man/Makefile scripts/Makefile)
+AC_OUTPUT(Makefile src/Makefile src/furlongd/Makefile include/Makefile doc/Makefile examples/Makefile man/Makefile scripts/Makefile)
