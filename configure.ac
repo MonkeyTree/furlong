@@ -10,7 +10,14 @@ AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
 AC_PROG_CC
-
+AM_PROG_CC_C_O
+CC_CHECK_CFLAGS_APPEND([-fvisibility=hidden])
+CC_CHECK_CFLAGS_APPEND([-g])
+CC_CHECK_CFLAGS_APPEND([-std=gnu89])
+CC_CHECK_CFLAGS_APPEND([-pedantic])
+CC_CHECK_CFLAGS_APPEND([-Wall])
+CC_CHECK_CFLAGS_APPEND([-Wextra])
+CC_CHECK_CFLAGS_APPEND([-Wno-unused-parameter])
 # Checks for libraries.
 
 # Checks for header files.
