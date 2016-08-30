@@ -134,111 +134,110 @@ int start_net_tcp (int port)
 	    }
   	  else if (sfd == events[i].data.fd)
 	    {
-              /* We have a notification on the listening socket, which
-                 means one or more incoming connections. */
-              while (1)
-                {
-                  struct sockaddr in_addr;
-                  socklen_t in_len;
-                  int infd;
-                  char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-
-                  in_len = sizeof in_addr;
-                  infd = accept (sfd, &in_addr, &in_len);
-                  if (infd == -1)
-                    {
-                      if ((errno == EAGAIN) ||
-                          (errno == EWOULDBLOCK))
-                        {
-                          /* We have processed all incoming
-                             connections. */
-                          break;
-                        }
-                      else
-                        {
-                          perror ("accept");
-                          break;
-                        }
-                    }
-
-                  s = getnameinfo (&in_addr, in_len,
-                                   hbuf, sizeof hbuf,
-                                   sbuf, sizeof sbuf,
-                                   NI_NUMERICHOST | NI_NUMERICSERV);
-                  if (s == 0)
-                    {
-                      (*conn.on_new_connection)(infd,sfd, hbuf, sbuf);
-                      //printf("Accepted connection on descriptor %d "
-                      //       "(host=%s, port=%s)\n", infd, hbuf, sbuf);
-                    }
-
-                  /* Make the incoming socket non-blocking and add it to the
-                     list of fds to monitor. */
-                  s = make_socket_non_blocking (infd);
-                  if (s == -1)
-                    abort ();
-
-                  event.data.fd = infd;
-                  event.events = EPOLLIN | EPOLLET;
-                  s = epoll_ctl (efd, EPOLL_CTL_ADD, infd, &event);
-                  if (s == -1)
-                    {
-                      perror ("epoll_ctl");
-                      abort ();
-                    }
-                }
-              continue;
-            }
-          else
+            /* We have a notification on the listening socket, which
+               means one or more incoming connections. */
+            while (1)
             {
-              /* We have data on the fd waiting to be read. Read and
-                 display it. We must read whatever data is available
-                 completely, as we are running in edge-triggered mode
-                 and won't get a notification again for the same
-                 data. */
-              int done = 0;
+              struct sockaddr in_addr;
+              socklen_t in_len;
+              int infd;
+              char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
-              while (1)
+              in_len = sizeof in_addr;
+              infd = accept (sfd, &in_addr, &in_len);
+              if (infd == -1)
               {
-                ssize_t count;
-                char buf[512];
-
-                count = read (events[i].data.fd, buf, sizeof buf);
-                if (count == -1)
+                if ((errno == EAGAIN) ||
+                    (errno == EWOULDBLOCK))
                 {
-                  /* If errno == EAGAIN, that means we have read all
-                     data. So go back to the main loop. */
-                  if (errno != EAGAIN)
-                    {
-                      perror ("read");
-                      done = 1;
-                    }
+                  /* We have processed all incoming
+                     connections. */
                   break;
                 }
-                else if (count == 0)
+                else
                 {
-                  /* End of file. The remote has closed the
-                     connection. */
-                  done = 1;
+                  perror ("accept");
                   break;
                 }
-
-                /* Write the buffer to standard output */
-                  
-                (*conn.on_data)(events[i].data.fd, events[i].data.fd, buf, count);
               }
 
-              if (done)
+              s = getnameinfo (&in_addr, in_len,
+                               hbuf, sizeof hbuf,
+                               sbuf, sizeof sbuf,
+                               NI_NUMERICHOST | NI_NUMERICSERV);
+              if (s == 0)
               {
-                (*conn.on_close_connection)(events[i].data.fd, events[i].data.fd);
-                //printf ("Closed connection on descriptor %d\n",
-                //        events[i].data.fd);
+                (*conn.on_new_connection)(infd,sfd, hbuf, sbuf);
+                //printf("Accepted connection on descriptor %d "
+                //       "(host=%s, port=%s)\n", infd, hbuf, sbuf);
+              }
 
-                /* Closing the descriptor will make epoll remove it
-                   from the set of descriptors which are monitored. */
-                close (events[i].data.fd);
+              /* Make the incoming socket non-blocking and add it to the
+                 list of fds to monitor. */
+              s = make_socket_non_blocking (infd);
+              if (s == -1)
+                abort ();
+
+              event.data.fd = infd;
+              event.events = EPOLLIN | EPOLLET;
+              s = epoll_ctl (efd, EPOLL_CTL_ADD, infd, &event);
+              if (s == -1)
+              {
+                perror ("epoll_ctl");
+                abort ();
               }
             }
+            continue;
+          }
+          else
+          {
+            /* We have data on the fd waiting to be read. Read and
+               display it. We must read whatever data is available
+               completely, as we are running in edge-triggered mode
+               and won't get a notification again for the same
+               data. */
+            int done = 0;
+
+            while (1)
+            {
+              ssize_t count;
+              char buf[512];
+
+              count = read (events[i].data.fd, buf, sizeof buf);
+              if (count == -1)
+              {
+                /* If errno == EAGAIN, that means we have read all
+                   data. So go back to the main loop. */
+                if (errno != EAGAIN)
+                  {
+                    (*conn.on_error)(events[i].data.fd, events[i].data.fd, NULL);
+                    perror ("read");
+                    done = 1;
+                  }
+                break;
+              }
+              else if (count == 0)
+              {
+                /* End of file. The remote has closed the
+                   connection. */
+                done = 1;
+                break;
+              }
+
+              /* route the buffer to on_data handler*/
+                
+              (*conn.on_data)(events[i].data.fd, events[i].data.fd, buf, count);
+            }
+
+            if (done)
+            {
+              (*conn.on_close_connection)(events[i].data.fd, events[i].data.fd);
+
+              /* Closing the descriptor will make epoll remove it
+                 from the set of descriptors which are monitored. */
+              close (events[i].data.fd);
+            }
+          }
         }
     }
 
