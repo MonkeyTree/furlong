@@ -1,5 +1,6 @@
 #include "net_tcp.h"
 #include "connection.h"
+#include "session.h"
 
 static int
 make_socket_non_blocking (int sfd)
@@ -79,6 +80,7 @@ int start_net_tcp (int port)
 
   connection_t conn;
   init_connection(&conn);
+  
 
   sfd = create_and_bind (port);
   if (sfd == -1)
