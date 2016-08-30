@@ -1,5 +1,5 @@
 #include "net_tcp.h"
-
+#include "connection.h"
 
 static int
 make_socket_non_blocking (int sfd)
@@ -77,11 +77,8 @@ int start_net_tcp (int port)
   struct epoll_event event;
   struct epoll_event *events;
 
-  //if (argc != 2)
-  //  {
-  //    fprintf (stderr, "Usage: %s [port]\n", argv[0]);
-  //    exit (EXIT_FAILURE);
-  //  }
+  connection_t conn;
+  init_connection(&conn);
 
   sfd = create_and_bind (port);
   if (sfd == -1)
@@ -93,50 +90,49 @@ int start_net_tcp (int port)
 
   s = listen (sfd, SOMAXCONN);
   if (s == -1)
-    {
-      perror ("listen");
-      abort ();
-    }
+  {
+    perror ("listen");
+    abort ();
+  }
 
   efd = epoll_create1 (0);
   if (efd == -1)
-    {
-      perror ("epoll_create");
-      abort ();
-    }
+  {
+    perror ("epoll_create");
+    abort ();
+  }
 
   event.data.fd = sfd;
   event.events = EPOLLIN | EPOLLET;
   s = epoll_ctl (efd, EPOLL_CTL_ADD, sfd, &event);
   if (s == -1)
-    {
-      perror ("epoll_ctl");
-      abort ();
-    }
+  {
+    perror ("epoll_ctl");
+    abort ();
+  }
 
   /* Buffer where events are returned */
   events = calloc (MAXEVENTS, sizeof event);
 
   /* The event loop */
   while (1)
-    {
-      int n, i;
+  {
+    int n, i;
 
-      n = epoll_wait (efd, events, MAXEVENTS, -1);
-      for (i = 0; i < n; i++)
-	{
-	  if ((events[i].events & EPOLLERR) ||
-              (events[i].events & EPOLLHUP) ||
-              (!(events[i].events & EPOLLIN)))
+    n = epoll_wait (efd, events, MAXEVENTS, -1);
+    for (i = 0; i < n; i++)
+    {
+  	  if ((events[i].events & EPOLLERR) ||
+          (events[i].events & EPOLLHUP) ||
+          (!(events[i].events & EPOLLIN)))
 	    {
-              /* An error has occured on this fd, or the socket is not
-                 ready for reading (why were we notified then?) */
+        /* An error has occured on this fd, or the socket is not
+           ready for reading (why were we notified then?) */
 	      fprintf (stderr, "epoll error\n");
 	      close (events[i].data.fd);
 	      continue;
 	    }
-
-	  else if (sfd == events[i].data.fd)
+  	  else if (sfd == events[i].data.fd)
 	    {
               /* We have a notification on the listening socket, which
                  means one or more incoming connections. */
@@ -171,8 +167,9 @@ int start_net_tcp (int port)
                                    NI_NUMERICHOST | NI_NUMERICSERV);
                   if (s == 0)
                     {
-                      printf("Accepted connection on descriptor %d "
-                             "(host=%s, port=%s)\n", infd, hbuf, sbuf);
+                      (*conn.on_new_connection)(infd,sfd, hbuf, sbuf);
+                      //printf("Accepted connection on descriptor %d "
+                      //       "(host=%s, port=%s)\n", infd, hbuf, sbuf);
                     }
 
                   /* Make the incoming socket non-blocking and add it to the
@@ -202,48 +199,45 @@ int start_net_tcp (int port)
               int done = 0;
 
               while (1)
+              {
+                ssize_t count;
+                char buf[512];
+
+                count = read (events[i].data.fd, buf, sizeof buf);
+                if (count == -1)
                 {
-                  ssize_t count;
-                  char buf[512];
-
-                  count = read (events[i].data.fd, buf, sizeof buf);
-                  if (count == -1)
+                  /* If errno == EAGAIN, that means we have read all
+                     data. So go back to the main loop. */
+                  if (errno != EAGAIN)
                     {
-                      /* If errno == EAGAIN, that means we have read all
-                         data. So go back to the main loop. */
-                      if (errno != EAGAIN)
-                        {
-                          perror ("read");
-                          done = 1;
-                        }
-                      break;
-                    }
-                  else if (count == 0)
-                    {
-                      /* End of file. The remote has closed the
-                         connection. */
+                      perror ("read");
                       done = 1;
-                      break;
                     }
-
-                  /* Write the buffer to standard output */
-                  s = write (1, buf, count);
-                  if (s == -1)
-                    {
-                      perror ("write");
-                      abort ();
-                    }
+                  break;
                 }
+                else if (count == 0)
+                {
+                  /* End of file. The remote has closed the
+                     connection. */
+                  done = 1;
+                  break;
+                }
+
+                /* Write the buffer to standard output */
+                  
+                (*conn.on_data)(events[i].data.fd, events[i].data.fd, buf, count);
+              }
 
               if (done)
-                {
-                  printf ("Closed connection on descriptor %d\n",
-                          events[i].data.fd);
+              {
+                (*conn.on_close_connection)(events[i].data.fd, events[i].data.fd);
+                //printf ("Closed connection on descriptor %d\n",
+                //        events[i].data.fd);
 
-                  /* Closing the descriptor will make epoll remove it
-                     from the set of descriptors which are monitored. */
-                  close (events[i].data.fd);
-                }
+                /* Closing the descriptor will make epoll remove it
+                   from the set of descriptors which are monitored. */
+                close (events[i].data.fd);
+              }
             }
         }
     }
