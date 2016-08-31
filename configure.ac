@@ -11,6 +11,20 @@ AC_CONFIG_HEADERS([config.h])
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
+
+
+AC_LANG([C++])
+AC_PROG_CXX([g++])
+AC_PROG_CC([gcc])
+
+# Initialize libtool (LT_OUTPUT builds ./libtool immediately, needed
+# if we want to do tests with libtool during configuration).
+#LT_PREREQ([2.2])
+LT_INIT
+LT_LANG([C++])
+LT_OUTPUT
+
+
 CC_CHECK_CFLAGS_APPEND([-fvisibility=hidden])
 CC_CHECK_CFLAGS_APPEND([-g])
 CC_CHECK_CFLAGS_APPEND([-std=gnu89])
